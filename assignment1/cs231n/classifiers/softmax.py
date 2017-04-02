@@ -1,6 +1,8 @@
 import numpy as np
 from random import shuffle
 
+
+
 def softmax_loss_naive(W, X, y, reg):
   """
   Softmax loss function, naive implementation (with loops)
@@ -29,7 +31,27 @@ def softmax_loss_naive(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+  num_classes = W.shape[1]
+  num_train = X.shape[0]
+  num_dim = X.shape[1]
+  loss = 0.0
+  for i in xrange(num_train):
+    scores = X[i].dot(W)
+    # correct_class_score = scores[y[i]]
+
+    # stable trick
+    unnormalized_log_possiblilty = scores - scores.max()
+    unnormalized_possiblilty = np.exp(unnormalized_log_possiblilty)
+    possibility = unnormalized_possiblilty / unnormalized_possiblilty.sum()
+    loss += - np.log(possibility[y[i]])
+    possibility[y[i]] -= 1
+    dW += X[i].reshape([num_dim, 1]).dot(possibility.reshape([1, num_classes]))
+
+
+
+  loss /= num_train
+  dW /= num_train
+  dW += reg * 2 * W
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
@@ -53,7 +75,24 @@ def softmax_loss_vectorized(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+  num_classes = W.shape[1]
+  num_train = X.shape[0]
+  loss = 0.0
+
+  scores = X.dot(W)
+  # correct_class_score = scores[y[i]]
+
+  # stable trick
+  unnormalized_log_possiblilty = scores - scores.max(1).reshape((num_train, 1))
+  unnormalized_possiblilty = np.exp(unnormalized_log_possiblilty)
+  possibility = unnormalized_possiblilty / unnormalized_possiblilty.sum(1).reshape((num_train, 1))
+  loss += - np.log(y.choose(possibility.T)).sum()
+  possibility[np.arange(num_train), y] -= 1  # strictly speaking it's no longer possibility after this step
+  dW += X.T.dot(possibility)
+
+  loss /= num_train
+  dW /= num_train
+  dW += reg * 2 * W
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
