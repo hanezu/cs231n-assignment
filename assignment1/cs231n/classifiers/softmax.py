@@ -88,7 +88,8 @@ def softmax_loss_vectorized(W, X, y, reg):
   possibility = unnormalized_possiblilty / unnormalized_possiblilty.sum(1).reshape((num_train, 1))
   loss += - np.log(y.choose(possibility.T)).sum()
   possibility[np.arange(num_train), y] -= 1  # strictly speaking it's no longer possibility after this step
-  dW += X.T.dot(possibility)
+  dscores = possibility
+  dW += X.T.dot(dscores)
 
   loss /= num_train
   dW /= num_train

@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from cs231n.classifiers.softmax import softmax_loss_vectorized
+
 
 class TwoLayerNet(object):
   """
@@ -74,11 +76,16 @@ class TwoLayerNet(object):
     # Store the result in the scores variable, which should be an array of      #
     # shape (N, C).                                                             #
     #############################################################################
-    pass
+
+    # Xn: result after n-th layer
+    X1 = X.dot(W1) + b1
+    X2 = np.maximum(X1, 0)
+    scores = X2.dot(W2) + b2
+
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
-    
+
     # If the targets are not given then jump out, we're done
     if y is None:
       return scores
@@ -92,7 +99,15 @@ class TwoLayerNet(object):
     # classifier loss. So that your results match ours, multiply the            #
     # regularization loss by 0.5                                                #
     #############################################################################
-    pass
+    # stable trick
+    unnormalized_possiblilty = np.exp(scores - scores.max(1).reshape((N, 1)))
+    possibility = unnormalized_possiblilty / unnormalized_possiblilty.sum(1).reshape((N, 1))
+    loss = - np.log(y.choose(possibility.T)).sum()
+    loss /= N
+    # loss += reg * (np.sum(W1 ** 2) + np.sum(W2 ** 2) + np.sum(b1 ** 2) + np.sum(b2 ** 2))
+    # why?
+    loss += 0.5 * reg * (np.sum(W1 ** 2) + np.sum(W2 ** 2))
+
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -104,7 +119,37 @@ class TwoLayerNet(object):
     # and biases. Store the results in the grads dictionary. For example,       #
     # grads['W1'] should store the gradient on W1, and be a matrix of same size #
     #############################################################################
-    pass
+
+    dscores = possibility  # strictly speaking it's no longer possibility after this step
+    dscores[np.arange(N), y] -= 1
+
+    dW2 = X2.T.dot(dscores)
+    dX2 = dscores.dot(W2.T)
+    db2 = dscores.sum(0)
+
+    dW2 /= N
+    dW2 += reg * W2
+    db2 /= N
+    # db2 += reg * 2 * b2
+    # b do not need regulation? because the magnitude of bias is not bad.
+
+    dX1 = dX2 * (X1 > 0)
+
+    dX = dX1.dot(W1.T)
+    dW1 = X.T.dot(dX1)
+    db1 = dX1.sum(0)
+    # db1 = dX1.dot(np.ones(W1.shape[1]))
+    # db1 = 1 * dX1
+
+    dW1 /= N
+    dW1 += reg * W1
+    db1 /= N
+    # db1 += reg * 2 * b1
+
+    grads['W1'] = dW1
+    grads['b1'] = db1
+    grads['W2'] = dW2
+    grads['b2'] = db2
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
