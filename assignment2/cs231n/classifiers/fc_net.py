@@ -46,6 +46,10 @@ class TwoLayerNet(object):
     # and biases using the keys 'W2' and 'b2'.                                 #
     ############################################################################
     pass
+    self.params['W1'] = weight_scale * np.random.randn(input_dim, hidden_dim)
+    self.params['b1'] = np.zeros(hidden_dim)  # do not need to be 2d array because it will broadcast as a row vector
+    self.params['W2'] = weight_scale * np.random.randn(hidden_dim, num_classes)
+    self.params['b2'] = np.zeros(num_classes)  # do not need to be 2d array because it will broadcast as a row vector
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -76,6 +80,8 @@ class TwoLayerNet(object):
     # class scores for X and storing them in the scores variable.              #
     ############################################################################
     pass
+    hidden_out, hidden_cache = affine_relu_forward(X, self.params['W1'], self.params['b1'])
+    scores, scores_cache = affine_forward(hidden_out, self.params['W2'], self.params['b2'])
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -95,7 +101,19 @@ class TwoLayerNet(object):
     # automated tests, make sure that your L2 regularization includes a factor #
     # of 0.5 to simplify the expression for the gradient.                      #
     ############################################################################
-    pass
+    loss, dscores = softmax_loss(scores, y)
+    dhidden, grads['W2'], grads['b2'] = affine_backward(dscores, scores_cache)
+    # W2 = scores_cache[1]  # cache = (x, w, b)
+    # dhidden_out = dscores.dot(W2)
+    # grads['W2'] = hidden_out.T.dot(dscores) + self.reg * W2
+    # grads['b2'] = dscores.sum(0)
+    # Not correct to write down them here! Should use modular form
+    dX, grads['W1'], grads['b1'] = affine_relu_backward(dhidden, hidden_cache)
+
+    # add regularization
+    loss += 0.5 * self.reg * ((self.params['W2'] ** 2).sum() + (self.params['W1'] ** 2).sum())
+    grads['W2'] += self.reg * self.params['W2']
+    grads['W1'] += self.reg * self.params['W1']
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################

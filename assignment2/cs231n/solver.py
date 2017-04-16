@@ -31,7 +31,8 @@ class Solver(object):
     'X_train': # training data
     'y_train': # training labels
     'X_val': # validation data
-    'X_train': # validation labels
+    # 'X_train': # validation labels
+    'y_val'???
   }
   model = MyAwesomeModel(hidden_size=100, reg=10)
   solver = Solver(model, data,
@@ -200,6 +201,7 @@ class Solver(object):
       y = y[mask]
 
     # Compute predictions in batches
+    # why? because model.loss cannot do it at once?
     num_batches = N / batch_size
     if N % batch_size != 0:
       num_batches += 1

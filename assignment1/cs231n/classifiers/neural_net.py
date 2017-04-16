@@ -128,7 +128,7 @@ class TwoLayerNet(object):
     db2 = dscores.sum(0)
 
     dW2 /= N
-    dW2 += reg * W2
+    dW2 += reg * W2  # we manually set it to half in order to have a simpler form
     db2 /= N
     # db2 += reg * 2 * b2
     # b do not need regulation? because the magnitude of bias is not bad.
