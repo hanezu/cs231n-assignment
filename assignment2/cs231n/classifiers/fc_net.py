@@ -1,4 +1,5 @@
 import numpy as np
+from astropy.io.fits.util import pairwise
 
 from cs231n.layers import *
 from cs231n.layer_utils import *
@@ -180,6 +181,12 @@ class FullyConnectedNet(object):
     # parameters should be initialized to zero.                                #
     ############################################################################
     pass
+
+    for layer_idx, layer_dims in enumerate(pairwise([input_dim] + hidden_dims + [num_classes])):
+      last_dim, next_dim = layer_dims
+      self.params['W%d' % (layer_idx + 1)] = weight_scale * np.random.randn(last_dim, next_dim)
+      self.params['b%d' % (layer_idx + 1)] = np.zeros(next_dim)
+
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -238,6 +245,16 @@ class FullyConnectedNet(object):
     # layer, etc.                                                              #
     ############################################################################
     pass
+    hidden_outs = []
+    hidden_caches = []
+    for i in xrange(1, self.num_layers):
+      hidden_in = hidden_outs[-1] if i > 1 else X
+      hidden_out, hidden_cache = affine_relu_forward(hidden_in, self.params['W%d' % i], self.params['b%d' % i])
+      hidden_outs.append(hidden_out)
+      hidden_caches.append(hidden_cache)
+
+    scores, scores_cache = affine_forward(hidden_outs[-1], self.params['W%d' % self.num_layers],
+                                          self.params['b%d' % self.num_layers])
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -261,6 +278,16 @@ class FullyConnectedNet(object):
     # of 0.5 to simplify the expression for the gradient.                      #
     ############################################################################
     pass
+    loss, dscores = softmax_loss(scores, y)
+    loss += 0.5 * self.reg * (np.sum([(self.params['W' + str(i)] ** 2).sum() for i in xrange(1, self.num_layers + 1)]))
+    dhidden, grads['W%d' % self.num_layers], grads['b%d' % self.num_layers] = affine_backward(dscores, scores_cache)
+    grads['W%d' % self.num_layers] += self.reg * self.params['W%d' % self.num_layers]
+    dhidden_outs = []
+    for i in xrange(self.num_layers - 1, 0, -1):
+      dhidden_in = dhidden_outs[-1] if i < self.num_layers - 1 else dhidden
+      dhidden_out, grads['W' + str(i)], grads['b' + str(i)] = affine_relu_backward(dhidden_in, hidden_caches[i - 1])
+      grads['W' + str(i)] += self.reg * self.params['W' + str(i)]
+      dhidden_outs.append(dhidden_out)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
