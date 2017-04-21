@@ -265,6 +265,10 @@ class FullyConnectedNet(object):
                                                              self.bn_params[i - 1])
       else:
         hidden_out, hidden_cache = affine_relu_forward(hidden_in, self.params['W%d' % i], self.params['b%d' % i])
+      if self.use_dropout:
+        hidden_out, dropout_cache = dropout_forward(hidden_out, self.dropout_param)
+        hidden_cache = list(hidden_cache)
+        hidden_cache.append(dropout_cache)
       hidden_outs.append(hidden_out)
       hidden_caches.append(hidden_cache)
 
@@ -299,12 +303,16 @@ class FullyConnectedNet(object):
     grads['W%d' % self.num_layers] += self.reg * self.params['W%d' % self.num_layers]
     dhidden_outs = []
     for i in xrange(self.num_layers - 1, 0, -1):
+      hidden_cache = hidden_caches[i - 1]
       dhidden_in = dhidden_outs[-1] if i < self.num_layers - 1 else dhidden
+      if self.use_dropout:
+        # pop the dropout cache
+        dhidden_in = dropout_backward(dhidden_in, hidden_cache.pop())
       if self.use_batchnorm:
         dhidden_out, grads['W' + str(i)], grads['b' + str(i)], grads['gamma' + str(i)], grads['beta' + str(i)] =\
-          affine_batch_relu_backward(dhidden_in, hidden_caches[i - 1])
+          affine_batch_relu_backward(dhidden_in, hidden_cache)
       else:
-        dhidden_out, grads['W' + str(i)], grads['b' + str(i)] = affine_relu_backward(dhidden_in, hidden_caches[i - 1])
+        dhidden_out, grads['W' + str(i)], grads['b' + str(i)] = affine_relu_backward(dhidden_in, hidden_cache)
       grads['W' + str(i)] += self.reg * self.params['W' + str(i)]
       dhidden_outs.append(dhidden_out)
     ############################################################################
