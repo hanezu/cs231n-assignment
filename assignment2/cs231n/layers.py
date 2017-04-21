@@ -178,6 +178,14 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     # storing your result in the running_mean and running_var variables.        #
     #############################################################################
     pass
+    sample_mean = x.mean(0)
+    sample_var = x.var(0)
+    running_mean = momentum * running_mean + (1 - momentum) * sample_mean
+    running_var = momentum * running_var + (1 - momentum) * sample_var
+    x_tilted = (x - sample_mean)/np.sqrt(sample_var + eps)
+    out = gamma * x_tilted + beta
+    cache = {'x': x, 'x_tilted': x_tilted, 'gamma': gamma, 'beta': beta,
+             'sample_mean': sample_mean, 'sample_var': sample_var, 'eps': eps}
     #############################################################################
     #                             END OF YOUR CODE                              #
     #############################################################################
@@ -189,6 +197,8 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     # the out variable.                                                         #
     #############################################################################
     pass
+    x_tilted = (x - running_mean)/np.sqrt(running_var + eps)
+    out = gamma * x_tilted + beta
     #############################################################################
     #                             END OF YOUR CODE                              #
     #############################################################################
@@ -225,6 +235,42 @@ def batchnorm_backward(dout, cache):
   # results in the dx, dgamma, and dbeta variables.                           #
   #############################################################################
   pass
+  gamma = cache['gamma']
+  x = cache['x']
+  mu_B = cache['sample_mean']
+  var_B = cache['sample_var']
+  eps = cache['eps']
+  N = x.shape[0]
+
+  dx1 = dout
+  dbeta = dout.sum(0)
+
+  dx_tilted = gamma * dx1
+  dgamma = (dx1 * cache['x_tilted']).sum(0)
+
+  x2 = x - mu_B
+  x5 = var_B + eps
+  x4 = np.sqrt(x5)
+  x3 = 1.0 / x4
+
+  #  x_tilted left branch
+  dx2 = x3 * dx_tilted
+  dx = dx2
+  dmu_B = -dx2.sum(0)
+
+  #  x_tilted right branch
+
+  dx3 = (x2 * dx_tilted).sum(0)
+
+  dx4 = -dx3 / x4 ** 2
+  dx5 = dx4 / (2 * np.sqrt(x5))
+  dvar_B = dx5
+  deps = dx5.sum()
+
+  #  last, consider dmu, dvar influence on dx
+  dx += dmu_B / N
+  dx += 2 * (x - mu_B) * dvar_B / N
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -255,10 +301,25 @@ def batchnorm_backward_alt(dout, cache):
   # single statement; our implementation fits on a single 80-character line.  #
   #############################################################################
   pass
+  gamma = cache['gamma']
+  x = cache['x']
+  mu_B = cache['sample_mean']
+  var_B = cache['sample_var']
+  eps = cache['eps']
+  N = x.shape[0]
+
+  dx_tilted = dout * gamma
+  dvar_B = -(dx_tilted * (x - mu_B)).sum(0) * (var_B + eps) ** -1.5 / 2.0
+  dmu_B = -dx_tilted.sum(0) / np.sqrt(var_B + eps)  # - 2 * dvar_B * (x - mu_B).sum(0) / N
+  dx = dx_tilted / np.sqrt(var_B + eps) + dmu_B / N + dvar_B * 2 * (x - mu_B) / N
+  dgamma = (dout * cache['x_tilted']).sum(0)
+  dbeta = dout.sum(0)
+  # from IPython.core.debugger import Tracer
+  # Tracer()()
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
-  
+
   return dx, dgamma, dbeta
 
 
@@ -322,7 +383,7 @@ def dropout_backward(dout, cache):
   """
   dropout_param, mask = cache
   mode = dropout_param['mode']
-  
+
   dx = None
   if mode == 'train':
     ###########################################################################
@@ -513,7 +574,7 @@ def spatial_batchnorm_backward(dout, cache):
   #############################################################################
 
   return dx, dgamma, dbeta
-  
+
 
 def svm_loss(x, y):
   """

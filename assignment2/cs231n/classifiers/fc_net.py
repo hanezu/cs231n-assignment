@@ -20,7 +20,7 @@ class TwoLayerNet(object):
   The learnable parameters of the model are stored in the dictionary
   self.params that maps parameter names to numpy arrays.
   """
-  
+
   def __init__(self, input_dim=3*32*32, hidden_dim=100, num_classes=10,
                weight_scale=1e-3, reg=0.0):
     """
@@ -37,7 +37,7 @@ class TwoLayerNet(object):
     """
     self.params = {}
     self.reg = reg
-    
+
     ############################################################################
     # TODO: Initialize the weights and biases of the two-layer net. Weights    #
     # should be initialized from a Gaussian with standard deviation equal to   #
@@ -74,7 +74,7 @@ class TwoLayerNet(object):
     - loss: Scalar value giving the loss
     - grads: Dictionary with the same keys as self.params, mapping parameter
       names to gradients of the loss with respect to those parameters.
-    """  
+    """
     scores = None
     ############################################################################
     # TODO: Implement the forward pass for the two-layer net, computing the    #
@@ -90,7 +90,7 @@ class TwoLayerNet(object):
     # If y is None then we are in test mode so just return scores
     if y is None:
       return scores
-    
+
     loss, grads = 0, {}
     ############################################################################
     # TODO: Implement the backward pass for the two-layer net. Store the loss  #
@@ -186,6 +186,13 @@ class FullyConnectedNet(object):
       last_dim, next_dim = layer_dims
       self.params['W%d' % (layer_idx + 1)] = weight_scale * np.random.randn(last_dim, next_dim)
       self.params['b%d' % (layer_idx + 1)] = np.zeros(next_dim)
+      if not self.use_batchnorm:
+        continue
+      if layer_idx >= len(hidden_dims):
+        # do not init last layer of batch norm
+        break
+      self.params['gamma%d' % (layer_idx + 1)] = np.ones(next_dim)
+      self.params['beta%d' % (layer_idx + 1)] = np.zeros(next_dim)
 
     ############################################################################
     #                             END OF YOUR CODE                             #
@@ -199,7 +206,7 @@ class FullyConnectedNet(object):
       self.dropout_param = {'mode': 'train', 'p': dropout}
       if seed is not None:
         self.dropout_param['seed'] = seed
-    
+
     # With batch normalization we need to keep track of running means and
     # variances, so we need to pass a special bn_param object to each batch
     # normalization layer. You should pass self.bn_params[0] to the forward pass
@@ -208,7 +215,7 @@ class FullyConnectedNet(object):
     self.bn_params = []
     if self.use_batchnorm:
       self.bn_params = [{'mode': 'train'} for i in xrange(self.num_layers - 1)]
-    
+
     # Cast all parameters to the correct datatype
     for k, v in self.params.iteritems():
       self.params[k] = v.astype(dtype)
@@ -226,7 +233,7 @@ class FullyConnectedNet(object):
     # Set train/test mode for batchnorm params and dropout param since they
     # behave differently during training and testing.
     if self.dropout_param is not None:
-      self.dropout_param['mode'] = mode   
+      self.dropout_param['mode'] = mode
     if self.use_batchnorm:
       for bn_param in self.bn_params:
         bn_param[mode] = mode
@@ -249,7 +256,15 @@ class FullyConnectedNet(object):
     hidden_caches = []
     for i in xrange(1, self.num_layers):
       hidden_in = hidden_outs[-1] if i > 1 else X
-      hidden_out, hidden_cache = affine_relu_forward(hidden_in, self.params['W%d' % i], self.params['b%d' % i])
+      if self.use_batchnorm:
+        # add the following line so that I don't need to restart kernel to import the new function
+        from cs231n.layer_utils import affine_batch_relu_forward
+        hidden_out, hidden_cache = affine_batch_relu_forward(hidden_in, self.params['W%d' % i], self.params['b%d' % i],
+                                                             self.params['gamma' + str(i)],
+                                                             self.params['beta' + str(i)],
+                                                             self.bn_params[i - 1])
+      else:
+        hidden_out, hidden_cache = affine_relu_forward(hidden_in, self.params['W%d' % i], self.params['b%d' % i])
       hidden_outs.append(hidden_out)
       hidden_caches.append(hidden_cache)
 
@@ -285,7 +300,11 @@ class FullyConnectedNet(object):
     dhidden_outs = []
     for i in xrange(self.num_layers - 1, 0, -1):
       dhidden_in = dhidden_outs[-1] if i < self.num_layers - 1 else dhidden
-      dhidden_out, grads['W' + str(i)], grads['b' + str(i)] = affine_relu_backward(dhidden_in, hidden_caches[i - 1])
+      if self.use_batchnorm:
+        dhidden_out, grads['W' + str(i)], grads['b' + str(i)], grads['gamma' + str(i)], grads['beta' + str(i)] =\
+          affine_batch_relu_backward(dhidden_in, hidden_caches[i - 1])
+      else:
+        dhidden_out, grads['W' + str(i)], grads['b' + str(i)] = affine_relu_backward(dhidden_in, hidden_caches[i - 1])
       grads['W' + str(i)] += self.reg * self.params['W' + str(i)]
       dhidden_outs.append(dhidden_out)
     ############################################################################
