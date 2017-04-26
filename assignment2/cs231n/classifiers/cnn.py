@@ -36,7 +36,7 @@ class ThreeLayerConvNet(object):
     self.params = {}
     self.reg = reg
     self.dtype = dtype
-    
+
     ############################################################################
     # TODO: Initialize weights and biases for the three-layer convolutional    #
     # network. Weights should be initialized from a Gaussian with standard     #
@@ -48,6 +48,13 @@ class ThreeLayerConvNet(object):
     # of the output affine layer.                                              #
     ############################################################################
     pass
+    C, H, W = input_dim
+    self.params['W1'] = weight_scale * np.random.randn(num_filters, C, filter_size, filter_size)
+    self.params['b1'] = np.zeros((num_filters, ))
+    self.params['W2'] = weight_scale * np.random.randn(num_filters * H / 2 * W / 2, hidden_dim)
+    self.params['b2'] = np.zeros((hidden_dim, ))
+    self.params['W3'] = weight_scale * np.random.randn(hidden_dim, num_classes)
+    self.params['b3'] = np.zeros((num_classes, ))
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -80,10 +87,16 @@ class ThreeLayerConvNet(object):
     # variable.                                                                #
     ############################################################################
     pass
+    N, C, H, W = X.shape
+    conv_out, conv_cache = conv_relu_pool_forward(X, W1, b1, conv_param, pool_param)
+    num_filter = conv_out.shape[1]
+    flat_conv_out = conv_out.reshape((N, num_filter * H / 2 * W / 2))
+    hidden_out, hidden_cache = affine_relu_forward(flat_conv_out, W2, b2)
+    scores, scores_cache = affine_forward(hidden_out, W3, b3)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
-    
+
     if y is None:
       return scores
     
@@ -95,6 +108,18 @@ class ThreeLayerConvNet(object):
     # for self.params[k]. Don't forget to add L2 regularization!               #
     ############################################################################
     pass
+    loss, dscores = softmax_loss(scores, y)
+    dhidden, grads['W3'], grads['b3'] = affine_backward(dscores, scores_cache)
+    dconv_flat, grads['W2'], grads['b2'] = affine_relu_backward(dhidden, hidden_cache)
+    dconv = dconv_flat.reshape((N, num_filter, H / 2, W / 2))
+    dX, grads['W1'], grads['b1'] = conv_relu_pool_backward(dconv, conv_cache)
+
+    # add regularization
+    loss += 0.5 * self.reg * ((self.params['W3'] ** 2).sum() +
+                              (self.params['W2'] ** 2).sum() + (self.params['W1'] ** 2).sum())
+    grads['W3'] += self.reg * self.params['W3']
+    grads['W2'] += self.reg * self.params['W2']
+    grads['W1'] += self.reg * self.params['W1']
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################

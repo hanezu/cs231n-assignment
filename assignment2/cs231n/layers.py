@@ -518,6 +518,16 @@ def max_pool_forward_naive(x, pool_param):
   # TODO: Implement the max pooling forward pass                              #
   #############################################################################
   pass
+  N, C, H, W = x.shape
+  HH, WW, stride = pool_param['pool_height'], pool_param['pool_width'], pool_param['stride']
+  H_prime = (H - HH)/stride + 1
+  W_prime = (W - WW)/stride + 1
+  out = np.zeros((N, C, H_prime, W_prime))
+  for i in xrange(H_prime):
+    h_start = i * stride
+    for j in xrange(W_prime):
+      w_start = j * stride
+      out[:, :, i, j] = x[:, :, h_start:h_start + HH, w_start:w_start + WW].max((2, 3))
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -541,6 +551,21 @@ def max_pool_backward_naive(dout, cache):
   # TODO: Implement the max pooling backward pass                             #
   #############################################################################
   pass
+  (x, pool_param) = cache
+  N, C, H, W = x.shape
+  HH, WW, stride = pool_param['pool_height'], pool_param['pool_width'], pool_param['stride']
+  H_prime = (H - HH)/stride + 1
+  W_prime = (W - WW)/stride + 1
+  dx = np.zeros_like(x)
+  for n in xrange(N):
+    for c in xrange(C):
+      for i in xrange(H_prime):
+        h_start = i * stride
+        for j in xrange(W_prime):
+          w_start = j * stride
+          local_x = x[n, c, h_start:h_start + HH, w_start:w_start + WW]
+          h, w = np.unravel_index(local_x.argmax(), (HH, WW))
+          dx[n, c, h_start + h, w_start + w] += dout[n, c, i, j]
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -579,6 +604,14 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
   # be very short; ours is less than five lines.                              #
   #############################################################################
   pass
+  N, C, H, W = x.shape
+  out = np.zeros((C, N, H * W))
+  cache = []
+  for c in xrange(C):
+    out[c], cache_c = batchnorm_forward(x[:, c].reshape((N, H * W)), gamma[c], beta[c], bn_param)
+    cache.append(cache_c)
+
+  out = np.swapaxes(out.reshape((C, N, H, W)), 0, 1)
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -609,6 +642,15 @@ def spatial_batchnorm_backward(dout, cache):
   # be very short; ours is less than five lines.                              #
   #############################################################################
   pass
+  N, C, H, W = dout.shape
+  dx = np.zeros((N, C, H * W))
+  dgamma = np.zeros((C, H * W))
+  dbeta = np.zeros((C, H * W))
+  for c in xrange(C):
+    dx[:, c], dgamma[c], dbeta[c] = batchnorm_backward_alt(dout[:, c].reshape((N, H * W)), cache[c])
+  dx = dx.reshape((N, C, H, W))
+  dgamma = dgamma.sum(1)
+  dbeta = dbeta.sum(1)
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
