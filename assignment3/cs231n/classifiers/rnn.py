@@ -136,6 +136,21 @@ class CaptioningRNN(object):
     # gradients for self.params[k].                                            #
     ############################################################################
     pass
+    N, T = captions.shape
+    h0 = features.dot(W_proj) + b_proj
+    captions_in_vec, captions_in_cache = word_embedding_forward(captions_in, W_embed)
+    if self.cell_type == 'rnn':
+      h, h_cache = rnn_forward(captions_in_vec, h0, Wx, Wh, b)
+    else:
+      pass
+    scores, scores_cache = temporal_affine_forward(h, W_vocab, b_vocab)
+    loss, dscores = temporal_softmax_loss(scores, captions_out, mask)
+
+    dh, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dscores, scores_cache)
+    dcaptions_in_vec, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dh, h_cache)
+    grads['W_embed'] = word_embedding_backward(dcaptions_in_vec, captions_in_cache)
+    grads['W_proj'] = features.T.dot(dh0)
+    grads['b_proj'] = dh0.sum(0)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################

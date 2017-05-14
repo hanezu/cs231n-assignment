@@ -33,6 +33,11 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
   # and cache variables respectively.                                          #
   ##############################################################################
   pass
+  affine_h = prev_h.dot(Wh)
+  affine_x = x.dot(Wx)
+  affine = affine_h + affine_x + b
+  next_h = np.tanh(affine)
+  cache = (prev_h, Wh, x, Wx, affine_h, affine_x, next_h)
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
@@ -62,6 +67,13 @@ def rnn_step_backward(dnext_h, cache):
   # of the output value from tanh.                                             #
   ##############################################################################
   pass
+  (prev_h, Wh, x, Wx, affine_h, affine_x, next_h) = cache
+  daffine = dnext_h * (1 - next_h ** 2)
+  db = daffine.sum(0)
+  dWh = prev_h.T.dot(daffine)
+  dWx = x.T.dot(daffine)
+  dx = daffine.dot(Wx.T)
+  dprev_h = daffine.dot(Wh.T)
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
@@ -93,6 +105,14 @@ def rnn_forward(x, h0, Wx, Wh, b):
   # above.                                                                     #
   ##############################################################################
   pass
+  N, T, D = x.shape
+  H, = b.shape
+  h = np.zeros((N, T, H))
+  cache = []
+  for t in xrange(T):
+    prev_h = h[:, t-1] if t > 0 else h0
+    h[:, t], cache_t = rnn_step_forward(x[:, t], prev_h, Wx, Wh, b)
+    cache.append(cache_t)
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
@@ -120,6 +140,20 @@ def rnn_backward(dh, cache):
   # defined above.                                                             #
   ##############################################################################
   pass
+  D = cache[0][2].shape[1]
+  N, T, H = dh.shape
+  dh_sum = np.zeros((N, H))
+  dx = np.zeros((N, T, D))
+  dWx = np.zeros((D, T, H))
+  dWh = np.zeros((H, T, H))
+  db = np.zeros((H, T))
+  for t in xrange(T - 1, -1, -1):
+    dh_sum += dh[:, t] # dh of time t-1 come from dh of time t and output of time t-1
+    dx[:, t], dh_sum, dWx[:, t], dWh[:, t], db[:, t] = rnn_step_backward(dh_sum, cache[t])
+  dWx = dWx.sum(1)
+  dWh = dWh.sum(1)
+  db = db.sum(1)
+  dh0 = dh_sum
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
@@ -134,7 +168,7 @@ def word_embedding_forward(x, W):
   
   Inputs:
   - x: Integer array of shape (N, T) giving indices of words. Each element idx
-    of x muxt be in the range 0 <= idx < V.
+    of x must be in the range 0 <= idx < V.
   - W: Weight matrix of shape (V, D) giving word vectors for all words.
   
   Returns a tuple of:
@@ -148,6 +182,9 @@ def word_embedding_forward(x, W):
   # HINT: This should be very simple.                                          #
   ##############################################################################
   pass
+  V, D = W.shape
+  out = W[x]
+  cache = (x, V, D)
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
@@ -176,6 +213,16 @@ def word_embedding_backward(dout, cache):
   # HINT: Look up the function np.add.at                                       #
   ##############################################################################
   pass
+  (x, V, D) = cache
+  dW = np.zeros((V, D))
+  np.add.at(dW, x, dout)
+  # be careful with below: dout[x == v] will choose the 1d-arrays of length D
+  # that is at the place of x == v
+  # therefore the result dout[x == v] would be reduced to 2d-array
+  # of shape (#{x==v}, D)
+  # then do the sum of row would ge the result
+  # for v in xrange(V):
+    # dW[v] = dout[x == v].sum(0)
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
@@ -411,7 +458,7 @@ def temporal_softmax_loss(x, y, mask, verbose=False):
   dx_flat[np.arange(N * T), y_flat] -= 1
   dx_flat /= N
   dx_flat *= mask_flat[:, None]
-  
+
   if verbose: print 'dx_flat: ', dx_flat.shape
   
   dx = dx_flat.reshape(N, T, V)
