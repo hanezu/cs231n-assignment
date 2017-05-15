@@ -213,6 +213,21 @@ class CaptioningRNN(object):
     # a loop.                                                                 #
     ###########################################################################
     pass
+    captions[:, 0] = self._start
+    h = features.dot(W_proj) + b_proj
+    h = h[:, np.newaxis, :]
+    # print h.shape
+    for t in xrange(max_length):
+      word_vec_in, _ = word_embedding_forward(captions[:, t:t + 1], W_embed)
+      h, _ = rnn_step_forward(word_vec_in, h, Wx, Wh, b)
+      # print h.shape
+      scores, _ = temporal_affine_forward(h, W_vocab, b_vocab)
+      # print captions[:, t:t+1].shape
+      # print word_vec_in.shape
+      # print h.shape
+      # print scores.shape
+      # print captions.shape
+      captions[:, t] = scores[:, 0].argmax(1) if t + 1 < max_length else self._end
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
