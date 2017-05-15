@@ -142,12 +142,15 @@ class CaptioningRNN(object):
     if self.cell_type == 'rnn':
       h, h_cache = rnn_forward(captions_in_vec, h0, Wx, Wh, b)
     else:
-      pass
+      h, h_cache = lstm_forward(captions_in_vec, h0, Wx, Wh, b)
     scores, scores_cache = temporal_affine_forward(h, W_vocab, b_vocab)
     loss, dscores = temporal_softmax_loss(scores, captions_out, mask)
 
     dh, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dscores, scores_cache)
-    dcaptions_in_vec, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dh, h_cache)
+    if self.cell_type == 'rnn':
+      dcaptions_in_vec, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dh, h_cache)
+    else:
+      dcaptions_in_vec, dh0, grads['Wx'], grads['Wh'], grads['b'] = lstm_backward(dh, h_cache)
     grads['W_embed'] = word_embedding_backward(dcaptions_in_vec, captions_in_cache)
     grads['W_proj'] = features.T.dot(dh0)
     grads['b_proj'] = dh0.sum(0)
@@ -215,18 +218,18 @@ class CaptioningRNN(object):
     pass
     captions[:, 0] = self._start
     h = features.dot(W_proj) + b_proj
-    h = h[:, np.newaxis, :]
-    # print h.shape
+    if self.cell_type != 'rnn':
+      c = np.zeros_like(h)
+    else:
+      h = h[:, np.newaxis, :]
     for t in xrange(max_length):
       word_vec_in, _ = word_embedding_forward(captions[:, t:t + 1], W_embed)
-      h, _ = rnn_step_forward(word_vec_in, h, Wx, Wh, b)
-      # print h.shape
-      scores, _ = temporal_affine_forward(h, W_vocab, b_vocab)
-      # print captions[:, t:t+1].shape
-      # print word_vec_in.shape
-      # print h.shape
-      # print scores.shape
-      # print captions.shape
+      if self.cell_type == 'rnn':
+        h, _ = rnn_step_forward(word_vec_in, h, Wx, Wh, b)
+        scores, _ = temporal_affine_forward(h, W_vocab, b_vocab)
+      else:
+        h, c, _ = lstm_step_forward(word_vec_in[:, 0], h, c, Wx, Wh, b)
+        scores, _ = temporal_affine_forward(h[:, np.newaxis], W_vocab, b_vocab)
       captions[:, t] = scores[:, 0].argmax(1) if t + 1 < max_length else self._end
     ############################################################################
     #                             END OF YOUR CODE                             #
